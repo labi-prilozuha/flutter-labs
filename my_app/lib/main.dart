@@ -54,8 +54,97 @@ class MainApp extends StatelessWidget {
 }
 
 /// Главный экран со списком привычек и блоком мотивации.
-class HabitsHomeScreen extends StatelessWidget {
+class HabitsHomeScreen extends StatefulWidget {
   const HabitsHomeScreen({super.key});
+
+  @override
+  State<HabitsHomeScreen> createState() => _HabitsHomeScreenState();
+}
+
+class _HabitsHomeScreenState extends State<HabitsHomeScreen> {
+  final List<HabitItem> _habits = [
+    const HabitItem(
+      title: 'Выпить стакан воды',
+      subtitle: 'Ежедневно',
+      isDone: true,
+    ),
+    const HabitItem(
+      title: 'Почитать 10 минут',
+      subtitle: 'Пн, Ср, Пт',
+      isDone: false,
+    ),
+    const HabitItem(
+      title: 'Прогулка 20 минут',
+      subtitle: 'Ежедневно',
+      isDone: true,
+    ),
+  ];
+
+  final TextEditingController _newHabitController = TextEditingController();
+
+  @override
+  void dispose() {
+    _newHabitController.dispose();
+    super.dispose();
+  }
+
+  void _openAddHabitDialog() {
+    _newHabitController.clear();
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Новая привычка'),
+          content: TextField(
+            controller: _newHabitController,
+            decoration: const InputDecoration(
+              hintText: 'Например: Сделать растяжку',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final text = _newHabitController.text.trim();
+                if (text.isNotEmpty) {
+                  setState(() {
+                    _habits.add(
+                      HabitItem(
+                        title: text,
+                        subtitle: 'Ежедневно',
+                        isDone: false,
+                      ),
+                    );
+                  });
+                }
+                Navigator.of(context).pop();
+              },
+              child: const Text('Добавить'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openStats() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => const HabitStatsScreen(),
+      ),
+    );
+  }
+
+  void _openEditHabit() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => const EditHabitScreen(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,12 +152,11 @@ class HabitsHomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('HabitFlow'),
         centerTitle: false,
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: Icon(Icons.info_outline),
-          ),
-        ],
+      ),
+      drawer: _MainDrawer(
+        onOpenHome: () => Navigator.of(context).pop(),
+        onOpenNewHabit: _openEditHabit,
+        onOpenStats: _openStats,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -85,24 +173,17 @@ class HabitsHomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: ListView(
-                children: const [
-                  HabitListItem(
-                    title: 'Выпить стакан воды',
-                    subtitle: 'Ежедневно',
-                    isDone: true,
-                  ),
-                  HabitListItem(
-                    title: 'Почитать 10 минут',
-                    subtitle: 'Пн, Ср, Пт',
-                    isDone: false,
-                  ),
-                  HabitListItem(
-                    title: 'Прогулка 20 минут',
-                    subtitle: 'Ежедневно',
-                    isDone: true,
-                  ),
-                ],
+              child: ListView.builder(
+                itemCount: _habits.length,
+                itemBuilder: (context, index) {
+                  final habit = _habits[index];
+                  return HabitListItem(
+                    title: habit.title,
+                    subtitle: habit.subtitle,
+                    isDone: habit.isDone,
+                    onTap: _openStats,
+                  );
+                },
               ),
             ),
           ],
@@ -110,7 +191,7 @@ class HabitsHomeScreen extends StatelessWidget {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FilledButton.icon(
-        onPressed: null, // ЛР4: пока без логики
+        onPressed: _openAddHabitDialog,
         icon: const Icon(Icons.add),
         label: const Text('Добавить привычку'),
         style: FilledButton.styleFrom(
@@ -167,11 +248,13 @@ class HabitListItem extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.isDone,
+    this.onTap,
   });
 
   final String title;
   final String subtitle;
   final bool isDone;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -196,6 +279,7 @@ class HabitListItem extends StatelessWidget {
         ),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.bar_chart_rounded),
+        onTap: onTap,
       ),
     );
   }
@@ -209,7 +293,10 @@ class EditHabitScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: const Icon(Icons.arrow_back),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text('Новая привычка'),
       ),
       body: SingleChildScrollView(
@@ -363,7 +450,10 @@ class HabitStatsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: const Icon(Icons.arrow_back),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text('Статистика: "Почитать 10 минут"'),
       ),
       body: Padding(
@@ -419,6 +509,70 @@ class _HistoryRow extends StatelessWidget {
       trailing: Icon(
         done ? Icons.check_circle : Icons.cancel_outlined,
         color: done ? colorScheme.primary : Colors.redAccent,
+      ),
+    );
+  }
+}
+
+class HabitItem {
+  const HabitItem({
+    required this.title,
+    required this.subtitle,
+    required this.isDone,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool isDone;
+}
+
+class _MainDrawer extends StatelessWidget {
+  const _MainDrawer({
+    required this.onOpenHome,
+    required this.onOpenNewHabit,
+    required this.onOpenStats,
+  });
+
+  final VoidCallback onOpenHome;
+  final VoidCallback onOpenNewHabit;
+  final VoidCallback onOpenStats;
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const DrawerHeader(
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  'HabitFlow',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Мои привычки'),
+              onTap: onOpenHome,
+            ),
+            ListTile(
+              leading: const Icon(Icons.add),
+              title: const Text('Новая привычка'),
+              onTap: onOpenNewHabit,
+            ),
+            ListTile(
+              leading: const Icon(Icons.bar_chart),
+              title: const Text('Статистика (пример)'),
+              onTap: onOpenStats,
+            ),
+          ],
+        ),
       ),
     );
   }
