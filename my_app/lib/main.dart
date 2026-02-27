@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const MainApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -34,6 +34,396 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+class MainApp extends StatelessWidget {
+  const MainApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'HabitFlow',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+        scaffoldBackgroundColor: Colors.grey[50],
+        useMaterial3: true,
+      ),
+      home: const HabitsHomeScreen(),
+    );
+  }
+}
+
+/// Главный экран со списком привычек и блоком мотивации.
+class HabitsHomeScreen extends StatelessWidget {
+  const HabitsHomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('HabitFlow'),
+        centerTitle: false,
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: Icon(Icons.info_outline),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _MotivationCard(),
+            const SizedBox(height: 24),
+            Text(
+              'Сегодня',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                children: const [
+                  HabitListItem(
+                    title: 'Выпить стакан воды',
+                    subtitle: 'Ежедневно',
+                    isDone: true,
+                  ),
+                  HabitListItem(
+                    title: 'Почитать 10 минут',
+                    subtitle: 'Пн, Ср, Пт',
+                    isDone: false,
+                  ),
+                  HabitListItem(
+                    title: 'Прогулка 20 минут',
+                    subtitle: 'Ежедневно',
+                    isDone: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: FilledButton.icon(
+        onPressed: null, // ЛР4: пока без логики
+        icon: const Icon(Icons.add),
+        label: const Text('Добавить привычку'),
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MotivationCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Мотивация дня',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green[900],
+                ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '«Сегодня отличный день, чтобы сделать шаг к своей цели!»',
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '— HabitFlow',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[700],
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class HabitListItem extends StatelessWidget {
+  const HabitListItem({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.isDone,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool isDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ListTile(
+        leading: Icon(
+          isDone ? Icons.check_circle : Icons.radio_button_unchecked,
+          color: isDone ? colorScheme.primary : Colors.grey,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDone ? Colors.black : Colors.black87,
+          ),
+        ),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.bar_chart_rounded),
+      ),
+    );
+  }
+}
+
+/// Экран добавления / редактирования привычки.
+class EditHabitScreen extends StatelessWidget {
+  const EditHabitScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: const Icon(Icons.arrow_back),
+        title: const Text('Новая привычка'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Название'),
+            const SizedBox(height: 8),
+            const TextField(
+              decoration: InputDecoration(
+                hintText: 'Например: Выпить стакан воды',
+                border: OutlineInputBorder(),
+              ),
+              enabled: false, // ЛР4: поле как часть вёрстки, без логики
+            ),
+            const SizedBox(height: 16),
+            const Text('Описание'),
+            const SizedBox(height: 8),
+            const TextField(
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Необязательно: зачем нужна привычка',
+                border: OutlineInputBorder(),
+              ),
+              enabled: false,
+            ),
+            const SizedBox(height: 16),
+            const Text('Иконка'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: const [
+                _IconPreview('😀'),
+                _IconPreview('💧'),
+                _IconPreview('📚'),
+                _IconPreview('🏃'),
+                _IconPreview('🧘'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text('Частота'),
+            const SizedBox(height: 8),
+            const _FrequencySection(),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: null, // ЛР4: без сохранения
+                    child: const Text('Сохранить'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: null, // ЛР4: без логики
+                    child: const Text('Отмена'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IconPreview extends StatelessWidget {
+  const _IconPreview(this.emoji);
+
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Text(
+        emoji,
+        style: const TextStyle(fontSize: 20),
+      ),
+    );
+  }
+}
+
+class _FrequencySection extends StatelessWidget {
+  const _FrequencySection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.radio_button_checked, size: 20),
+            SizedBox(width: 8),
+            Text('Ежедневно'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: const [
+            Icon(Icons.radio_button_unchecked, size: 20),
+            SizedBox(width: 8),
+            Text('По дням недели'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          children: const [
+            _DayChip(label: 'Пн'),
+            _DayChip(label: 'Вт'),
+            _DayChip(label: 'Ср'),
+            _DayChip(label: 'Чт'),
+            _DayChip(label: 'Пт'),
+            _DayChip(label: 'Сб'),
+            _DayChip(label: 'Вс'),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DayChip extends StatelessWidget {
+  const _DayChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text(label),
+      backgroundColor: Colors.grey[200],
+    );
+  }
+}
+
+/// Экран статистики по привычке.
+class HabitStatsScreen extends StatelessWidget {
+  const HabitStatsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: const Icon(Icons.arrow_back),
+        title: const Text('Статистика: "Почитать 10 минут"'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Текущая серия: 5 дней подряд',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            const Text('Всего выполнено за 30 дней: 18'),
+            const SizedBox(height: 24),
+            Text(
+              'История (последние 7 дней)',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                children: const [
+                  _HistoryRow(day: 'Пн', done: true),
+                  _HistoryRow(day: 'Вт', done: false),
+                  _HistoryRow(day: 'Ср', done: true),
+                  _HistoryRow(day: 'Чт', done: true),
+                  _HistoryRow(day: 'Пт', done: true),
+                  _HistoryRow(day: 'Сб', done: false),
+                  _HistoryRow(day: 'Вс', done: true),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.day, required this.done});
+
+  final String day;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+      leading: Text(day),
+      trailing: Icon(
+        done ? Icons.check_circle : Icons.cancel_outlined,
+        color: done ? colorScheme.primary : Colors.redAccent,
+      ),
+    );
+  }
+}
+
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
