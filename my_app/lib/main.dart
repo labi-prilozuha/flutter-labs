@@ -1,42 +1,34 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const MainApp());
-}
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final prefs = await SharedPreferences.getInstance();
+  final habitsRepository = HabitsRepository(
+    HabitLocalStorageService(prefs),
+  );
+  final motivationRepository = MotivationRepository(
+    MotivationApiService(),
+  );
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
+  final viewModel = HabitsViewModel(
+    habitsRepository: habitsRepository,
+    motivationRepository: motivationRepository,
+  );
+
+  await viewModel.loadInitialData();
+
+  runApp(MainApp(viewModel: viewModel));
 }
 
 class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+  const MainApp({super.key, required this.viewModel});
+
+  final HabitsViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -48,42 +40,39 @@ class MainApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.grey[50],
         useMaterial3: true,
       ),
-      home: const HabitsHomeScreen(),
+      home: HabitsHomeScreen(viewModel: viewModel),
     );
   }
 }
 
 /// Главный экран со списком привычек и блоком мотивации.
 class HabitsHomeScreen extends StatefulWidget {
-  const HabitsHomeScreen({super.key});
+  const HabitsHomeScreen({super.key, required this.viewModel});
+
+  final HabitsViewModel viewModel;
 
   @override
   State<HabitsHomeScreen> createState() => _HabitsHomeScreenState();
 }
 
 class _HabitsHomeScreenState extends State<HabitsHomeScreen> {
-  final List<HabitItem> _habits = [
-    const HabitItem(
-      title: 'Выпить стакан воды',
-      subtitle: 'Ежедневно',
-      isDone: true,
-    ),
-    const HabitItem(
-      title: 'Почитать 10 минут',
-      subtitle: 'Пн, Ср, Пт',
-      isDone: false,
-    ),
-    const HabitItem(
-      title: 'Прогулка 20 минут',
-      subtitle: 'Ежедневно',
-      isDone: true,
-    ),
-  ];
-
   final TextEditingController _newHabitController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    widget.viewModel.addListener(_onViewModelChanged);
+  }
+
+  void _onViewModelChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
+    widget.viewModel.removeListener(_onViewModelChanged);
     _newHabitController.dispose();
     super.dispose();
   }
@@ -107,20 +96,14 @@ class _HabitsHomeScreenState extends State<HabitsHomeScreen> {
               child: const Text('Отмена'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 final text = _newHabitController.text.trim();
                 if (text.isNotEmpty) {
-                  setState(() {
-                    _habits.add(
-                      HabitItem(
-                        title: text,
-                        subtitle: 'Ежедневно',
-                        isDone: false,
-                      ),
-                    );
-                  });
+                  await widget.viewModel.addHabit(text);
                 }
-                Navigator.of(context).pop();
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
               },
               child: const Text('Добавить'),
             ),
@@ -148,6 +131,8 @@ class _HabitsHomeScreenState extends State<HabitsHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = widget.viewModel;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('HabitFlow'),
@@ -163,7 +148,10 @@ class _HabitsHomeScreenState extends State<HabitsHomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _MotivationCard(),
+            _MotivationCard(
+              quote: vm.motivationQuote,
+              isLoading: vm.isLoading,
+            ),
             const SizedBox(height: 24),
             Text(
               'Сегодня',
@@ -173,18 +161,22 @@ class _HabitsHomeScreenState extends State<HabitsHomeScreen> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: ListView.builder(
-                itemCount: _habits.length,
-                itemBuilder: (context, index) {
-                  final habit = _habits[index];
-                  return HabitListItem(
-                    title: habit.title,
-                    subtitle: habit.subtitle,
-                    isDone: habit.isDone,
-                    onTap: _openStats,
-                  );
-                },
-              ),
+              child: vm.habits.isEmpty
+                  ? const Center(
+                      child: Text('Пока нет привычек. Добавьте первую!'),
+                    )
+                  : ListView.builder(
+                      itemCount: vm.habits.length,
+                      itemBuilder: (context, index) {
+                        final habit = vm.habits[index];
+                        return HabitListItem(
+                          title: habit.title,
+                          subtitle: habit.subtitle,
+                          isDone: habit.isDone,
+                          onTap: _openStats,
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -206,8 +198,22 @@ class _HabitsHomeScreenState extends State<HabitsHomeScreen> {
 }
 
 class _MotivationCard extends StatelessWidget {
+  const _MotivationCard({
+    required this.quote,
+    required this.isLoading,
+  });
+
+  final MotivationQuote? quote;
+  final bool isLoading;
+
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    final displayText = quote?.text ??
+        'Сегодня отличный день, чтобы сделать шаг к своей цели!';
+    final displayAuthor = quote?.author ?? 'HabitFlow';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -220,22 +226,29 @@ class _MotivationCard extends StatelessWidget {
         children: [
           Text(
             'Мотивация дня',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.green[900],
-                ),
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Colors.green[900],
+            ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            '«Сегодня отличный день, чтобы сделать шаг к своей цели!»',
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '— HabitFlow',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[700],
-                ),
-          ),
+          if (isLoading)
+            const SizedBox(
+              height: 24,
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else ...[
+            Text('«$displayText»'),
+            const SizedBox(height: 4),
+            Text(
+              '— $displayAuthor',
+              style: textTheme.bodySmall?.copyWith(
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -514,16 +527,191 @@ class _HistoryRow extends StatelessWidget {
   }
 }
 
-class HabitItem {
-  const HabitItem({
+class MotivationQuote {
+  const MotivationQuote({
+    required this.text,
+    required this.author,
+  });
+
+  final String text;
+  final String author;
+}
+
+class Habit {
+  const Habit({
+    required this.id,
     required this.title,
     required this.subtitle,
     required this.isDone,
   });
 
+  final String id;
   final String title;
   final String subtitle;
   final bool isDone;
+
+  Habit copyWith({
+    String? id,
+    String? title,
+    String? subtitle,
+    bool? isDone,
+  }) {
+    return Habit(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      isDone: isDone ?? this.isDone,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'subtitle': subtitle,
+      'isDone': isDone,
+    };
+  }
+
+  factory Habit.fromJson(Map<String, dynamic> json) {
+    return Habit(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      subtitle: json['subtitle'] as String? ?? '',
+      isDone: json['isDone'] as bool? ?? false,
+    );
+  }
+}
+
+class HabitLocalStorageService {
+  HabitLocalStorageService(this._prefs);
+
+  final SharedPreferences _prefs;
+
+  static const _habitsKey = 'habits';
+
+  Future<List<Habit>> loadHabits() async {
+    final jsonString = _prefs.getString(_habitsKey);
+    if (jsonString == null || jsonString.isEmpty) {
+      return const [];
+    }
+
+    try {
+      final raw = jsonDecode(jsonString) as List<dynamic>;
+      return raw
+          .map((item) => Habit.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> saveHabits(List<Habit> habits) async {
+    final jsonString = jsonEncode(
+      habits.map((h) => h.toJson()).toList(),
+    );
+    await _prefs.setString(_habitsKey, jsonString);
+  }
+}
+
+class HabitsRepository {
+  HabitsRepository(this._localStorage);
+
+  final HabitLocalStorageService _localStorage;
+
+  Future<List<Habit>> loadHabits() => _localStorage.loadHabits();
+
+  Future<void> saveHabits(List<Habit> habits) =>
+      _localStorage.saveHabits(habits);
+}
+
+class MotivationApiService {
+  MotivationApiService({http.Client? client}) : _client = client ?? http.Client();
+
+  final http.Client _client;
+
+  Future<MotivationQuote?> fetchRandomQuote() async {
+    try {
+      final uri = Uri.parse('https://zenquotes.io/api/random');
+      final response = await _client.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        if (data.isNotEmpty) {
+          final first = data.first as Map<String, dynamic>;
+          final text = first['q'] as String? ??
+              'Сегодня отличный день, чтобы сделать шаг к своей цели!';
+          final author = first['a'] as String? ?? 'Неизвестный автор';
+          return MotivationQuote(text: text, author: author);
+        }
+      }
+    } catch (_) {
+      // При ошибке вернём null, чтобы использовать заглушку.
+    }
+    return null;
+  }
+}
+
+class MotivationRepository {
+  MotivationRepository(this._apiService);
+
+  final MotivationApiService _apiService;
+
+  Future<MotivationQuote> loadMotivationQuote() async {
+    final remote = await _apiService.fetchRandomQuote();
+    return remote ??
+        const MotivationQuote(
+          text: 'Сегодня отличный день, чтобы сделать шаг к своей цели!',
+          author: 'HabitFlow',
+        );
+  }
+}
+
+class HabitsViewModel extends ChangeNotifier {
+  HabitsViewModel({
+    required this.habitsRepository,
+    required this.motivationRepository,
+  });
+
+  final HabitsRepository habitsRepository;
+  final MotivationRepository motivationRepository;
+
+  List<Habit> _habits = const [];
+  MotivationQuote? _motivationQuote;
+  bool _isLoadingHabits = false;
+  bool _isLoadingQuote = false;
+
+  List<Habit> get habits => _habits;
+
+  MotivationQuote? get motivationQuote => _motivationQuote;
+
+  bool get isLoading => _isLoadingHabits || _isLoadingQuote;
+
+  Future<void> loadInitialData() async {
+    _isLoadingHabits = true;
+    _isLoadingQuote = true;
+    notifyListeners();
+
+    _habits = await habitsRepository.loadHabits();
+    _isLoadingHabits = false;
+    notifyListeners();
+
+    _motivationQuote = await motivationRepository.loadMotivationQuote();
+    _isLoadingQuote = false;
+    notifyListeners();
+  }
+
+  Future<void> addHabit(String title) async {
+    final newHabit = Habit(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      subtitle: 'Ежедневно',
+      isDone: false,
+    );
+    _habits = [..._habits, newHabit];
+    notifyListeners();
+    await habitsRepository.saveHabits(_habits);
+  }
 }
 
 class _MainDrawer extends StatelessWidget {
